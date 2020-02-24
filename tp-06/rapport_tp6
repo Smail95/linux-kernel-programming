@@ -1,0 +1,72 @@
+# AIDER Smail
+# Sorbone Universite (UPMC)					    
+# 30/03/2019										
+########################################################################
+### [PNL] RAPPORT TME 06: Mécanismes de communication du noyau Linux ###
+########################################################################
+
+##############
+### EXO 01 ###
+##############
+
+#Q1
+>> Ok
+#Q2
+>> OK
+
+#############
+## EXO 02 ###
+#############
+
+#Q1, 2, 3 
+>> OK
+
+##############
+### EXO 03 ###
+##############
+
+#Q1
+>> Le role de <struct pid>:
+>  La structure pid represente la notion interne de l'identifiant d'un processus.
+>  Elle fait reference à un processus, un groupe de processus et des sessions.
+>  Elle est stocke dans une table de hachage permetant de trouver rapidement le pid recherche.
+>  Utiliser une structure pour stocker le pid permet de les deux problemes:
+>  1. Stocker les valeurs de <pid_t> dans le noyau et les referencer plus tard pose un probleme.
+>  2. Referencer un processus utilisteur en sauvegardant la reference de la structure
+>  <task_struct> pose aussi un  probleme de memoire.
+
+#Q2
+>> L'unité de mesure de <task_struct>->utime et ->stime est nanoseconds.
+
+#3
+>> Les relations entre <struct pid> et <struct task_struct>:
+>  Obtenir <struct task_struct> via <struct pid>
+-- struct task_struct *get_pid_task(struct pid *pid, enum pid_type);
+>  Retrouver <struct pid> via <struct task_struct>
+-- struct pid *get_task_pid(struct task_struct *task, enum pid_type type);
+
+##############
+### EXO 04 ###
+##############
+
+#Q1
+>> Ok
+#Q2
+>> Il faut rendre la reference de la <struct pid> lorsqu'on finit de l'utiliser,
+>  donc c'est lors de dechargement du module car c'est à ce moment la qu'on a plus besoin 
+>  vu qu'on conserve la structure <struct task_monitor>.
+
+#Q3
+>> Ok
+
+################
+### EXO 05&6 ###
+################
+>> Ok
+
+
+############################################################################################
+#---links ---------------------------------------------------------------------------------#
+############################################################################################
+
+> https://github.com/cjok/device-model/blob/master/kobject/kobj-example.c

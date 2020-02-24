@@ -1,0 +1,63 @@
+# AIDER Smail
+# Sorbone Universite (UPMC)					    
+# 30/03/2019										
+#####################################################################################
+### [PNL] RAPPORT TME 07: Mécanismes de gestion de la mémoire dans le noyau Linux ###
+#####################################################################################
+
+############################################################
+# EXO 01 : Monitoring de l’activité d’un processus (suite) #
+############################################################
+>> Ok
+
+################################################################
+# EXO 02 : Récupération automatique de la mémoire, le shrinker #
+################################################################
+
+#Q1 
+>> 
+
+################################################################
+# EXO 03 : Gestion efficace de la mémoire avec les slab	       #
+################################################################
+
+#Q1 
+>> ksize() et sizeof() de <struct task_sample>:
+-- ksize: 32
+-- sizeof: 8
+>  kmalloc fait une allocation de 2^n - k (k: quelques octets de gestion),
+>  donc le ksize pour faire un arondie superrieur de la taille demander.
+
+#Q2
+>> Voir Linux Kernel Development et link <2>
+
+
+#################################################################
+# EXO 04 : Pré-allocation de la mémoire avec les mempools	#
+#################################################################
+
+#Q1
+>> Voir link <2>
+
+#################################################################
+# EXO 05 : Récupération « au besoin » de la mémoire : kref	#
+#################################################################
+
+#Q1 ?
+
+#################################################################################
+# EXO 06 : Accès aux informations de monitoring depuis l’espace utilisateur	#
+#################################################################################
+
+#Q1
+>> 
+
+
+
+
+
+
+#### link: ####
+
+<1> https://census-labs.com/news/2012/01/03/linux-kernel-heap-exploitation/ 
+<2> https://www.oreilly.com/library/view/linux-device-drivers/0596005903/ch08.html

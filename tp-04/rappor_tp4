@@ -1,0 +1,93 @@
+#############################################
+### RAPPORT TME 04: Mes premiers modules  ###
+#############################################
+
+
+####################################
+#   EXO01 : Mes premiers modules   #
+####################################
+
+#Q01
+>> Le fichier qui sera chargé dans le noyau est le: <.ko>
+
+#Q02
+>> Chargement du module:
+-- insmod <module_name.ko>
+>> On peut lire le message "Hello World":
+>  Sur le terminal courant 
+>  via la commande dmesg
+
+#Q03
+>> helloWorldParam.c
+
+#Q04
+>> Ajouter une description aux parametres: 
+-- MODULE_PARM_DESC(<param>, "DESC");
+
+#Q05
+-- module_param(<param>, <type>, <droits>);
+>> En meme temps qu'on associe un param avec des droits != de <0000>, il va y avoir dans /sys/module/nom_module/parameters/ un fichier par parametre declaré.
+>> Il suffit de modifier le contenu de ses fichiers pour modifier la valeur des paramatres du module.
+>> Les droits sont codés en octal sur 3 degits.
+
+
+#####################################################################
+# EXO02 : Modification d'une variable du noyau à l'aide d'un module #
+#####################################################################
+
+#Q01
+>> La variable globale <init_uts_ns> est initialisée dans /init/version.c. Elle contient differents champs, parmi, on trouve le <.name.sysname> qui est initialisé à la valeur de la MACRO <UTS_SYSNAME>(/include/linux/uts.h). 
+>> La varibale peut etre accédee par tous les modules dont la licence est compatible avec la licence GPL:
+-- EXPORT_SYMBOL_GPL(init_uts_ns)
+
+#Q02
+>> Creation du module uname:
+> Le champs <int_uts_ns.name.sysname> est un char[__NEW_UTS_LEN+1] (definit dans /include/linux/utsname.h). 
+> Lors de chargement du module, il suffit de modifier la valeur de <.name.sysname>
+> Lors de dechargement, il est imperatif de restaurer sa valeur à celle definit dans la MACRO <UTS_SYSNAME> pour une question de droit.
+
+
+###################################
+# EXO03 : Les limites des modules #
+###################################
+
+#Q01
+>> La compilation et le chargement du module <show_sb.c> necessite l'acces au symbole <iterate_supers()> du noyau, donc il faut modifier le code noyau afin d'exporter ce symbole et ensuite recompiler: 
+-- /fs/super.c -- EXPORT_SYMBOL(iterate_supers);
+>> Une fois que c'est fait, il suffit de creer une fonction à passer en parametre à <iterate_supers> et afficher les informations necessaire en utilisant le bon formatage.
+
+#Q02
+>> Pour sauvegarder la derniere fois qu'on a accede au systeme de fichiers, il faut ajouter un champs dans <struct super_block>.
+>> Pour prendre en compte l'ajoue d'un nouveau systeme de fichiers, il faut ajouter un autre champs(boolean) pour marquer les nouveaux fs.
+
+
+######################################
+# EXO04 : Cacher un module - rootkit #
+######################################
+
+#Q01
+>> La liste des modules chargés sont dans /proc/modules
+>> Les informations concernant un module sont enregistres dans /sys/module/module_name/
+
+#Q02
+>> Pour cacher le module hideModule, il suffit de le retirer de la liste des modules via <del_list()> en le referençant avec THIS_MODULE.
+>  n'est plus visible avec lsmod
+
+#Q03
+>> Le module est bien visible dans /sys/mudule/hideModule/
+
+#Q4
+>> voir doc : www.kernel.org/doc/documentation/kobject.txt
+>> Pour rendre le module invisible dans le sysfs, il faut le :
+>  de-referencer le kobject de la list list_head
+>  de-referencer le kobject de la list kset
+>  de-referencer le kobject du pere
+>  liberer l'espace memoire correspondante au kobject - !!! non celle du pere
+
+
+
+
+
+
+
+

@@ -1,0 +1,247 @@
+# AIDER Smail
+# Sorbone Universite (UPMC)					    
+# 15/03/2019										
+#####################################################
+### [PNL] RAPPORT TME 05: Débogage du noyau Linux ###
+#####################################################
+
+###########################################
+# EXO 01 : Connection du débogueur KGDB   #
+###########################################
+
+#01
+>> activer l'option kgdb avant de compiler le noyau
+-- make nconfig
+  "Kernel hacking"/"Kernel debugging" and  select "KGDB: kernel debugger"
+>> more info:
+-- https://www.kernel.org/doc/htmldocs/kgdb/CompilingAKernel.html
+
+#Q2
+>> Le moyen de communication utilise est une connextion TCP sur le port 1234, man -s, 
+-- -s : Shorthand for -gdb tcp::1234, i.e. open a gdbserver on TCP port 1234
+
+#Q3
+>> Pour se connecter à la machine virtuelle: 
+-- $gdb target remote tcp::1234
+
+#Q4
+>> $ help info thread
+-- Display curently known threads
+>> $ help monitor
+-- Send a command to the remote monitor(remote targets only)
+>  it is possible to run a limited set of kdb commands from gdb, using gdb monitor commands,
+>  like: lsmod, dmegs, ps, ... etc.
+>> $ monitor ps 
+-- Display active task list 
+>> To see all kdb all commands:
+-- $ monitor help
+ 
+#Q5
+>> $ help continue:
+-- Continue program being degugged, after a signal or breakpoint.
+ 
+#Q6
+>> Enter the kernel debugger manually or waiting for an oops or fault.
+>  When logged in as root, run:
+-- echo  g > /proc/sysrq-trigger 
+>> Shut off the system:
+-- echo o > /proc/sysrq-trigger
+# https://en.wikipedia.org/wiki/Magic_SysRq_key
+
+#>>
+>> Enable kgdboc on ttyS0 after the kernel has booted:
+-- echo ttyS0 > /sys/module/kgdboc/parameters/kgdboc
+>> Disable kgdboc:
+-- echo "" > /sys/module/kgdboc/parameters/kgdboc
+>> When logged in as root:
+-- echo g > /proc/sysrq-trigger
+
+
+###################################
+# EXO 02 : Prise en main de KGDB  #
+###################################
+
+#Q1
+>> <init_uts_ns> est initialise dans version.c
+
+#Q2
+>> Se rendre  dans le repertoire /linux/ ou se trouve le fichier <vmlinux>,
+>  (attention: il peut avoir un autre nom comme,ex. vmlinux-x.x.x-generic):
+-- (gdb)$ cd linux-4.19
+>> Use vmlinux as program to be debugged, it is read for its symbols, ...
+-- (gdb)$ file vmlinux
+>> Find where symbol <init_uts_ns> is stored:
+-- (gdb)$ info address init_uts_ns
+>> Find SYM source:
+-- (gdb)$ info sources init_uts_ns
+>> List content file where symbol <init_uts_ns> was found:
+-- (gdb)$ list init_uts_ns
+>> Print some <init_uts_ns> field:
+-- (gdb)$ print(init_uts_ns.name.sysname)
+-- "Linux"
+-- (gdb)$ print(init_uts_ns.name.release)
+-- "4.19.27-pnl" 
+>> Modifie <release> field:
+-- (gdb)$ set variable init_uts_ns.name.release = "aider"
+>> Check the result
+-- uname -r 
+
+###############################
+#  EXO 03 : Mon premier bug   #
+###############################
+
+#Q1
+>> Fonctionnement:
+> le module <hanging> crie un kthread et le met en attente(sleep) apres avoir changer son etat et l'enlever de la file des processus pret à s'executer 
+> pour le reveiller au bout de 60*HZ, sauf si il y a eu un appel explicite à wake_up_process().
+>> More infos:
+>> kthread_run(): create and wake a thread.
+>> kthread_stop(): stop a thread created by kthread_create().
+>> set_current_state(): changes the state of the currently executing processfrom TASK_RUNNING to TASK_UNINTERRUPTIBLE.
+>> schedule(): could be used by a process to indicate voluntarily to the scheduler that it can schedule some other process on the processor.
+-- P0: state = TASK_RUNNING
+-- schedule()
+--> schedule another process
+-- P0: state = TASK_UN/INTERRUPTIBLE 
+-- schedule()
+--> the currently executing process is moved oof the run queue before another process is scheduled.
+>> schedule_timeout(timeout): puts the process to sleep until timeout(in jiffies) have elapsed. 
+>  <jiffies> is a kernel variable that is incremented for every timer interrupt.
+
+#Q2
+>> Notre thread est bloque pendant 60 seconds, sauf que dans le noyau, il y une tache qui inspect l'etat des processus et regarde s'il y a des
+> taches bloquees dans l'etat UNINTERRUPTIBLE plus que la periode definie dans </kernel/hung_task_timeout_secs> qui est egale a 30secs. si le cas, 
+> un message davertissement est affiche sur la console. 
+ 
+ #Q3
+>> Pour interrompre le noyau au moment de l'apparition de ce message, il faut activer l'option <Detect Hang Task>:
+-- make nconfig
+-- Kernel hacking -->
+-- Debug Lockups dans Hangs -->
+-- Detect Hang Task (*)
+
+#Q4
+>> Affichage de la pile:
+-- (gdb)$ backtrace
+>  Non
+
+#Q5
+>> Afficher la pile d'appels du module au moment du bug
+-- (gdb)$ monitor ps
+-- pid [424]  command [*khungtaskd]
+-- pid [1687] command [my_hanging_fn]
+-- (gdb)$ monitor btp <pid>
+>> on peut voir le code du module dans la trace correspondant au pid <1687: my_hanging_fn>
+
+#Q6 > ?
+>> La premiere adresse correspond à l'adresse memoire de la <struct module> du module.
+>> La seconde adresse correspond à l'adresse de chargement du module.
+-- hanging	16384  0xffffffffa0002000    0  (Live) 0xffffffffa0000000 [ ]
+
+#Q7  > ?
+>> Sol1: Modifier la configuration du noyau:
+>  Disactiver la detection des "hung" taches en mettant timemout = 0 :
+-- Kernel hacking -->
+-- Debug Lockups dans Hangs -->
+-- (0) default timeout for hang task detection (in seconds)
+> ou en ecrivant 0 dans /proc/sys/kernel/hung_task_timeout_secs :
+-- echo 0 > /proc/sys/kernel/hung_task_timeout_secs
+>> Sol2: Modifier le module:
+>  refaire un schedule_time_out() de la valeur definit dans <hung_task_timeout_secs> autant de fois(boucle !!!). 
+
+
+#####################################
+#  EXO 04 : Affichages dynamiques   #
+#####################################
+
+#Q1
+>> L'affichage n'apparait pas dans le logs du noyau car l'affichage n'est activer depuis le fichier prdebug.c
+>  aucun flags n'est positione (=_)
+-- # grep -i prdebug /sys/kernel/debug/dynamic_debug/control
+-- [prdebug]prdebug_timeout =_ "reactivating timer\012"
+
+#Q2
+>> Pour activer TOUS les affichages de débogage du module:
+-- echo -n 'module   prdebug       +p'     > /sys/kernel/debug/dynamic_debug/control
+--                 <module_name> <FLAGS>     <DEBUGFS>
+>  Flag <p> : enables the pr_debug() callsite 
+
+>># grep -i prdebug /sys/kernel/debug/dynamic_debug/control
+-- /home/aider/vm/share/prdebug.c:17  		[prdebug]prdebug_timeout =p 	 "nr irqs %lu\012"
+-- <------filename-------------->:<lineno>  <module> <---function--> <flags> <----format-----> 
+
+#Q3
+>> Pour activer l'affichage de certaines informations, il suffit de rajouter les flags appropries:
+-- echo -n 'module prdebug +plmf' > /sys/kernel/debug/dynamic_debug/control
+
+#Q4
+>> Pour activer l'affichage d'UN message de debogage:
+-- echo -n 'file prdebug.c line 17 +p' > /sys/kernel/debug/dynamic_debug/control
+
+
+#####################################
+#   EXO 05 : Debogage d'un module   #
+#####################################
+
+#Q1
+>> OK
+#Q2
+>> Le systeme crash car il ya un segmentation fault/ 
+
+#Q3
+>> Chargement des symboles du module à l'adresse de chargement du module
+-- (gdb)$ monitor lsmod 
+--  kcpustat               16384  0xffffffffa0002040    0  (Live) 0xffffffffa0000000 [ ]
+-- (gdb)$ add-symbol-file ../share/kcpustat.o  0xffffffffa0000000
+
+
+#Q4
+>> La ligne qui pose probleme est: 
+-- (gdb)$ backtrace
+-- kcpustats.c:75: print_stats() -- sum.cpustat[i] += k->stat.cpustat[i];
+>> Le vrai probleme vient de la ligne juste apres:
+-- list_del(&k->list);
+>  car la boucle list_for_each_entry() à besoin de k->list.next pour parcourir la list (voir le fonctionnement dans list.h).
+
+#Q5
+>> Le probleme vient de la struct <list_head>.
+>> Le programme plante à nouveau car on refait un <list_del()> sur un element deja supprime:
+-- kcpustats.c:88: print_stats() -- list_del(&first->list)
+
+#Q6
+>> Activer l'option de debogage des listes doublement chainees(CONFIG_DEBUG_LIST=y):
+-- Kernel hacking --->
+-- Debug linked list manipulation [*]
+>> il ya un <list_del> corruption, car l'element est deja supprime
+-- list_del corruption, ffff88807ca78b40->next is LIST_POISON1
+>> Sol: commenter la ligner 88: list_del(&first->list)
+
+#Q7
+>> Activer l'outil de detection de fuites memoire (CONFIG_DEBUG_KMEMLEAK=y):
+-- Kernel hacking --->
+-- Memory Debugging --->
+-- Kernel memory leak detector [*]
+>> Defois, il est necessaire d'augmenter la taille du buffer :
+-- CONFIG_DEBUG_KMEMLEAK_EARLY_LOG_SIZE
+
+#Q8
+>> Display the details of all the possible memory leaks:
+-- cat /sys/kenel/debug/kmemleak
+>  If error like:
+-- cat: can't open '/sys/kernel/debug/kmemleak': Device or resource busy
+>  configure buffer size (++CONFIG_DEBUG_KMEMLEAK_EARLY_LOG_SIZE). 
+>> To trigger an intermediate memory scan:
+-- echo scan > /sys/kernel/debug/kmemleak
+>> Le probleme vient de : ?
+>  
+
+############################################################################################
+#---links ---------------------------------------------------------------------------------#
+############################################################################################
+
+> https://www.kernel.org/doc/html/v4.11/admin-guide/dynamic-debug-howto.html#
+> http://www.alexlambert.com/2017/12/18/kernel-debugging-for-newbies.html
+> https://www.linuxjournal.com/article/8144
+> https://www.thegeekdiary.com/info-task-processpid-blocked-for-more-than-120-seconds-system-becomes-unresponsive/
+> https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_MRG/2/html/Realtime_Tuning_Guide/Mount_debugfs.html
+> https://www.kernel.org/doc/html/v4.15/dev-tools/kmemleak.html?highlight=memory%20leak#
